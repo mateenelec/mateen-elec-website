@@ -153,6 +153,7 @@
 <footer><div class="container footer-row"><div><strong>MATEEN ELEC</strong><br>Électricité générale · Reims</div><div class="footer-links"><a href="#services">Services</a><a href="#contact">Contact</a><a href="mailto:mateenelec.51@gmail.com">E-mail</a><a href="tel:0767755769">Téléphone</a></div><div>© <span id="year"></span> MATEEN ELEC. Tous droits réservés.</div></div></footer><a class="float-wa" href="https://wa.me/33767755769" target="_blank" rel="noopener">WhatsApp</a>
 <script>
 const menu=document.getElementById('menu'),nav=document.getElementById('nav');menu.addEventListener('click',()=>nav.classList.toggle('open'));nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>nav.classList.remove('open')));document.getElementById('year').textContent=new Date().getFullYear();
+
 document.getElementById('contactForm').addEventListener('submit', async function(e) {
   e.preventDefault();
 
@@ -164,25 +165,54 @@ document.getElementById('contactForm').addEventListener('submit', async function
   button.textContent = 'Envoi en cours...';
 
   try {
+    const data = new FormData(form);
+    const files = [...(data.getAll('attachments'))]
+      .filter(file => file instanceof File && file.size > 0);
+
+    data.delete('attachments');
+
+    if (files.length > 0) {
+      if (files.length > 5 || files.some(file => file.size > 10 * 1024 * 1024)) {
+        throw new Error('Maximum 5 fichiers de 10 Mo chacun.');
+      }
+
+      const uploadData = new FormData();
+      files.forEach(file => uploadData.append('attachments', file));
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadData
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Impossible de transférer les fichiers.');
+      }
+
+      const uploadResult = await uploadResponse.json();
+
+      data.append('submissionId', uploadResult.submissionId);
+    }
+
     const response = await fetch('/api/contact', {
       method: 'POST',
-      body: new FormData(form)
+      body: data
     });
 
     if (!response.ok) {
-      throw new Error('Échec de l’envoi');
+      throw new Error("Échec de l'envoi de la demande.");
     }
 
     alert('Votre demande a bien été envoyée. Nous vous contacterons rapidement.');
     form.reset();
 
   } catch (error) {
-    alert("Une erreur est survenue. Veuillez réessayer.");
+    alert(error.message || 'Une erreur est survenue. Veuillez réessayer.');
   } finally {
     button.disabled = false;
     button.textContent = originalText;
   }
 });
+
 
 
 let selected = 0;
